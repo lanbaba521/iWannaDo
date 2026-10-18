@@ -1,0 +1,27 @@
+# ---- 通用 ----
+
+# IDE / 编辑器本地配置
+.idea/
+*.iml
+.vscode/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+
+# ---- Node 依赖 ----
+node_modules/
+
+# ---- Android 构建产物 ----
+# 存放 APK 的目录：tool/*/android/app/build/outputs/apk/
+# （android/.gitignore 中已有 build/ 与 *.apk 规则，这里在仓库根再兜底）
+*.apk
+*.aab
+*/android/app/build/
+*/android/app/outputs/
+
+# 本地 SDK / JDK 配置
+local.properties
