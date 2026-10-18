@@ -1,0 +1,770 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f6f7fb">
+  <title>物品管家</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      --primary: #4f7cff;
+      --ink: #202536;
+      --muted: #8a90a0;
+      --line: #edf0f5;
+      --page: #f6f7fb;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+    }
+    button, input, textarea { font: inherit; }
+    button { -webkit-tap-highlight-color: transparent; }
+    .app-shell {
+      width: 100%;
+      max-width: 560px;
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 0 20px calc(28px + var(--safe-bottom));
+      background: var(--page);
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: calc(18px + env(safe-area-inset-top, 0px)) 0 18px;
+    }
+    .brand { display: flex; align-items: center; gap: 11px; }
+    .brand-mark {
+      display: grid;
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      place-items: center;
+      border: 0;
+      border-radius: 15px;
+      background: var(--primary);
+      color: white;
+      font-size: 22px;
+      font-weight: 800;
+      box-shadow: 0 7px 16px #4f7cff35;
+      transition: transform .16s ease;
+    }
+    .brand-mark:active { transform: scale(.94); }
+    .brand h1 { margin: 0; font-size: 20px; letter-spacing: .2px; }
+    .brand p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+    .toolbar { display: flex; gap: 8px; }
+    .icon-button {
+      min-width: 42px;
+      min-height: 42px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: white;
+      color: #626a7d;
+      font-size: 12px;
+      font-weight: 650;
+    }
+    .overview {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 11px;
+      margin: 5px 0 14px;
+    }
+    .stat-card {
+      min-height: 92px;
+      padding: 14px;
+      border: 1px solid #eef0f6;
+      border-radius: 20px;
+      background: white;
+      box-shadow: 0 5px 18px #17234808;
+      color: inherit;
+      text-align: left;
+      -webkit-appearance: none;
+      appearance: none;
+      cursor: pointer;
+      transition: border-color .16s ease, box-shadow .16s ease;
+    }
+    .stat-card.active {
+      border-color: #b9caff;
+      box-shadow: 0 0 0 2px #4f7cff26, 0 5px 18px #1723480d;
+    }
+    .stat-label { color: var(--muted); font-size: 11px; }
+    .stat-number { display: block; margin-top: 7px; font-size: 23px; font-weight: 750; letter-spacing: -.6px; }
+    .stat-unit { margin-left: 4px; color: var(--muted); font-size: 11px; font-weight: 500; }
+    .stat-card.danger .stat-number { color: #dc5a5a; }
+    .stat-card.warn .stat-number { color: #d98a24; }
+    .stat-card.money .stat-number { color: #22836a; }
+    .stat-currency { margin-right: 2px; font-size: 14px; }
+    .field input.short { width: 96px; }
+    .date-picker {
+      padding: 8px;
+      border: 1px solid #e8eaf0;
+      border-radius: 13px;
+      background: #fbfcfe;
+    }
+    .date-picker-head { display: flex; gap: 6px; }
+    .date-value {
+      flex: 1;
+      min-height: 42px;
+      padding: 0 12px;
+      border: 1px solid #e8eaf0;
+      border-radius: 11px;
+      background: white;
+      color: #a7acb8;
+      text-align: left;
+      font-size: 14px;
+      font-weight: 650;
+    }
+    .date-value.filled { border-color: #cddaff; background: #f7f9ff; color: var(--primary); }
+    .date-clear {
+      min-height: 42px;
+      padding: 0 13px;
+      border: 1px solid #e8eaf0;
+      border-radius: 11px;
+      background: white;
+      color: #8a90a0;
+      font-size: 12px;
+      font-weight: 650;
+    }
+    .date-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+    .date-quick button {
+      min-height: 30px;
+      padding: 0 11px;
+      border: 1px solid #e9ecf3;
+      border-radius: 999px;
+      background: white;
+      color: #73798a;
+      font-size: 12px;
+    }
+    .date-quick button:active { border-color: #cddaff; background: #f2f5ff; color: var(--primary); }
+    .date-calendar {
+      margin-top: 8px;
+      padding: 10px;
+      border: 1px solid #eef0f5;
+      border-radius: 13px;
+      background: white;
+      animation: sheet-in .18s ease-out;
+    }
+    .date-calendar[hidden] { display: none; }
+    .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .cal-nav {
+      width: 34px;
+      height: 34px;
+      border: 0;
+      border-radius: 10px;
+      background: #f4f5f8;
+      color: #717787;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .cal-title { font-size: 13px; font-weight: 700; }
+    .cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+    .cal-week { margin-bottom: 5px; }
+    .cal-week span { color: #9aa0af; text-align: center; font-size: 11px; }
+    .cal-day {
+      display: grid;
+      min-height: 36px;
+      place-items: center;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--ink);
+      font-size: 13px;
+    }
+    .cal-empty { min-height: 36px; }
+    .cal-day.today { background: #f0f4ff; color: var(--primary); font-weight: 750; }
+    .cal-day.selected { background: var(--primary); color: white; font-weight: 750; }
+    .search-wrap { position: relative; margin-bottom: 17px; }
+    .search-icon {
+      position: absolute;
+      top: 50%;
+      left: 16px;
+      color: #9aa0af;
+      font-size: 17px;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+    .search-input {
+      width: 100%;
+      height: 50px;
+      padding: 0 16px 0 44px;
+      border: 1px solid transparent;
+      border-radius: 16px;
+      outline: none;
+      background: white;
+      color: var(--ink);
+      box-shadow: 0 4px 14px #17234808;
+    }
+    .search-input:focus { border-color: #c9d6ff; }
+    .search-input::placeholder { color: #a0a5b2; }
+    .date-filters { display: flex; gap: 8px; margin: 0 1px 14px; }
+    .date-filter {
+      position: relative;
+      display: flex;
+      flex: 1;
+      min-width: 0;
+      height: 40px;
+      align-items: center;
+      padding-right: 5px;
+      border: 1px solid #e9ecf3;
+      border-radius: 13px;
+      background: white;
+      transition: border-color .16s ease;
+    }
+    .date-filter:focus-within { border-color: #cddaff; }
+    .date-filter-input {
+      flex: 1;
+      min-width: 0;
+      height: 100%;
+      padding: 0 2px 0 12px;
+      border: 0;
+      outline: none;
+      background: transparent;
+      color: var(--primary);
+      font-size: 13.5px;
+      font-weight: 650;
+    }
+    .date-filter-input::placeholder { color: #9aa0af; font-weight: 500; }
+    .date-filter-toggle {
+      flex: 0 0 auto;
+      display: grid;
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      place-items: center;
+      border: 0;
+      border-radius: 9px;
+      background: #f4f6fa;
+      color: #7b8291;
+      transition: background .16s ease, color .16s ease;
+    }
+    .date-filter-toggle::after {
+      content: '';
+      width: 7px;
+      height: 7px;
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      border-radius: 0 0 2px 0;
+      transform: translateY(-2px) rotate(45deg);
+      transition: transform .18s ease;
+    }
+    .date-filter.open .date-filter-toggle { background: #eaf0ff; color: var(--primary); }
+    .date-filter.open .date-filter-toggle::after { transform: translateY(2px) rotate(225deg); }
+    .date-filter-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      z-index: 4;
+      min-width: 112px;
+      max-height: 240px;
+      overflow-y: auto;
+      padding: 6px;
+      border: 1px solid #eef0f5;
+      border-radius: 15px;
+      background: white;
+      box-shadow: 0 10px 30px #1723481f;
+      animation: menu-in .16s ease-out;
+    }
+    .date-filter:last-child .date-filter-menu { right: 0; left: auto; }
+    .date-filter-menu[hidden] { display: none; }
+    .date-filter-option {
+      display: block;
+      width: 100%;
+      padding: 10px 12px;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: #454c5c;
+      text-align: left;
+      font-size: 13px;
+    }
+    .date-filter-option.active { background: #f2f5ff; color: var(--primary); font-weight: 650; }
+    .category-row {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      margin: 0 -20px 17px;
+      padding: 0 20px 3px;
+      scrollbar-width: none;
+    }
+    .category-row::-webkit-scrollbar { display: none; }
+    .category-chip {
+      flex: 0 0 auto;
+      min-height: 36px;
+      padding: 0 15px;
+      border: 1px solid #e9ecf3;
+      border-radius: 999px;
+      background: white;
+      color: #73798a;
+      font-size: 13px;
+    }
+    .category-chip.active {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: white;
+      font-weight: 650;
+    }
+    .item-list { display: grid; gap: 11px; padding-bottom: 94px; }
+    .day-group {
+      overflow: hidden;
+      border: 1px solid #eef0f5;
+      border-radius: 19px;
+      background: white;
+      box-shadow: 0 4px 15px #17234807;
+    }
+    .day-group[open] { border-color: #dbe4ff; }
+    .day-summary {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 56px;
+      padding: 0 16px;
+      cursor: pointer;
+      list-style: none;
+    }
+    .day-summary::-webkit-details-marker { display: none; }
+    .day-date { flex: 1; color: #454c5c; font-size: 14px; font-weight: 700; }
+    .day-meta { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .day-chevron { color: #b3b8c4; font-size: 13px; transition: transform .18s ease; }
+    .day-group[open] .day-chevron { transform: rotate(180deg); }
+    .day-body { padding: 2px 16px 14px; border-top: 1px solid #f2f4f8; }
+    .day-body .item-card {
+      padding: 13px 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+    .day-body .item-card + .item-card { border-top: 1px dashed #f0f2f7; }
+    .item-card {
+      padding: 16px;
+      border: 1px solid #eef0f5;
+      border-radius: 19px;
+      background: white;
+      box-shadow: 0 4px 15px #17234807;
+    }
+    .item-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .item-name { min-width: 0; margin: 1px 0 0; overflow-wrap: anywhere; font-size: 16px; font-weight: 700; }
+    .item-quantity { flex: 0 0 auto; color: var(--primary); font-size: 14px; font-weight: 700; }
+    .item-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+    .tag {
+      max-width: 100%;
+      padding: 5px 9px;
+      overflow-wrap: anywhere;
+      border-radius: 8px;
+      background: #f2f5ff;
+      color: #5571bd;
+      font-size: 11px;
+    }
+    .tag.location { background: #f3f5f7; color: #707786; }
+    .tag.expiry.expired { background: #fdeced; color: #c9483f; font-weight: 650; }
+    .tag.expiry.soon { background: #fdf4e6; color: #b0771b; font-weight: 650; }
+    .tag.expiry.normal { background: #f3f5f7; color: #707786; }
+    .tag.produced { background: #f3f5f7; color: #707786; }
+    .tag.amount { background: #eaf6f0; color: #22836a; font-weight: 650; }
+    .item-note {
+      margin: 11px 0 0;
+      overflow-wrap: anywhere;
+      color: #858b99;
+      font-size: 12px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+    .empty-state {
+      padding: 48px 20px;
+      border: 1px dashed #e0e4ed;
+      border-radius: 20px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .empty-icon { display: block; margin-bottom: 10px; font-size: 30px; }
+    .add-button {
+      position: fixed;
+      right: max(20px, calc((100vw - 520px) / 2));
+      bottom: calc(18px + var(--safe-bottom));
+      z-index: 3;
+      display: flex;
+      min-height: 56px;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 0 23px;
+      border: 0;
+      border-radius: 18px;
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 9px 24px #4f7cff55;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .add-button span { font-size: 22px; font-weight: 400; line-height: 1; }
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      background: #11182770;
+    }
+    .modal-backdrop[hidden] { display: none; }
+    .sheet {
+      width: 100%;
+      max-width: 560px;
+      max-height: min(92vh, 800px);
+      overflow-y: auto;
+      padding: 10px 20px calc(18px + var(--safe-bottom));
+      border-radius: 25px 25px 0 0;
+      background: #fff;
+      animation: sheet-in .22s ease-out;
+    }
+    @keyframes sheet-in { from { transform: translateY(24px); opacity: .8; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes menu-in { from { transform: translateY(-6px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .sheet-handle { width: 38px; height: 4px; margin: 0 auto 17px; border-radius: 4px; background: #e5e7ec; }
+    .sheet-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 17px; }
+    .sheet-header h2 { margin: 0; font-size: 18px; }
+    .close-button {
+      width: 38px;
+      height: 38px;
+      border: 0;
+      border-radius: 13px;
+      background: #f4f5f8;
+      color: #717787;
+      font-size: 22px;
+    }
+    .dialog {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: #11182770;
+      animation: fade-in .16s ease-out;
+    }
+    .dialog[hidden] { display: none; }
+    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+    .dialog-card {
+      width: 100%;
+      max-width: 340px;
+      padding: 23px;
+      border-radius: 23px;
+      background: white;
+      box-shadow: 0 22px 52px #10152838;
+      animation: dialog-in .2s ease-out;
+    }
+    @keyframes dialog-in {
+      from { transform: translateY(14px) scale(.96); opacity: 0; }
+      to { transform: translateY(0) scale(1); opacity: 1; }
+    }
+    .dialog-title { margin: 0; font-size: 16px; font-weight: 750; }
+    .dialog-text {
+      margin: 10px 0 0;
+      overflow-wrap: anywhere;
+      color: #7d8494;
+      font-size: 13px;
+      line-height: 1.65;
+    }
+    .dialog-actions { display: flex; gap: 10px; margin-top: 21px; }
+    .dialog-button {
+      flex: 1;
+      min-height: 46px;
+      border: 1px solid #e8eaf0;
+      border-radius: 14px;
+      background: white;
+      color: #4c5364;
+      font-size: 14px;
+      font-weight: 650;
+    }
+    .dialog-button:active { background: #f5f6fa; }
+    .dialog-button[hidden] { display: none; }
+    .dialog-button.primary {
+      border-color: transparent;
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 9px 22px #4f7cff3d;
+    }
+    .dialog-button.primary.danger { background: #e0605c; box-shadow: 0 9px 22px #e0605c3d; }
+    #intro-dialog .dialog-card { max-height: calc(100vh - 48px); overflow-y: auto; }
+    .intro-list { margin: 12px 0 0; padding: 0 0 0 19px; color: #7d8494; font-size: 13px; line-height: 1.7; }
+    .intro-list li + li { margin-top: 6px; }
+    .intro-repo {
+      margin-top: 15px;
+      padding: 11px 12px;
+      border: 1px solid #eef0f5;
+      border-radius: 14px;
+      background: #fbfcfe;
+    }
+    .intro-repo-label { display: block; margin-bottom: 7px; color: var(--muted); font-size: 11px; }
+    .intro-repo-row { display: flex; align-items: center; gap: 8px; }
+    .intro-repo-url {
+      flex: 1;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      color: #45506b;
+      font-size: 11.5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .intro-copy {
+      flex: 0 0 auto;
+      min-height: 32px;
+      padding: 0 12px;
+      border: 1px solid #e8eaf0;
+      border-radius: 10px;
+      background: white;
+      color: #4c5364;
+      font-size: 12px;
+      font-weight: 650;
+    }
+    .intro-hint { margin: 13px 0 0; color: #7d8494; font-size: 12.5px; line-height: 1.65; }
+    .intro-hint strong { color: var(--primary); font-weight: 750; }
+    .form-grid { display: grid; gap: 13px; }
+    .field label { display: block; margin: 0 0 7px 2px; color: #5e6575; font-size: 12px; font-weight: 650; }
+    .field input, .field textarea {
+      width: 100%;
+      min-height: 48px;
+      padding: 12px 14px;
+      border: 1px solid #e8eaf0;
+      border-radius: 13px;
+      outline: none;
+      background: #fbfcfe;
+      color: var(--ink);
+      font-size: 14px;
+    }
+    .field textarea { min-height: 78px; resize: vertical; line-height: 1.5; }
+    .field input:focus, .field textarea:focus { border-color: #9db5ff; background: white; }
+    .field input::placeholder, .field textarea::placeholder { color: #a7acb8; }
+    .category-picker { display: flex; flex-wrap: wrap; gap: 8px; }
+    .category-picker .category-chip { min-height: 38px; }
+    .category-input { margin-top: 10px; }
+    .form-actions { display: flex; gap: 10px; margin-top: 19px; }
+    .form-actions button {
+      min-height: 50px;
+      border: 0;
+      border-radius: 14px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .save-button { flex: 1; background: var(--primary); color: white; }
+    .delete-button { padding: 0 18px; background: #fff0f0; color: #d84a4a; }
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      clip-path: inset(50%);
+    }
+    @media (min-width: 560px) {
+      body { padding: 16px 0; }
+      .app-shell { min-height: calc(100vh - 32px); border-radius: 26px; box-shadow: 0 12px 50px #1723480d; }
+      .add-button { right: calc((100vw - 520px) / 2 + 20px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <button class="brand-mark" id="brand-button" type="button" aria-label="查看使用细则">物</button>
+        <div>
+          <h1>物品管家</h1>
+          <p>让每件物品都有自己的位置</p>
+        </div>
+      </div>
+      <div class="toolbar" aria-label="数据管理">
+        <button class="icon-button" id="export-button" type="button">导出</button>
+        <button class="icon-button" id="import-button" type="button">导入</button>
+        <input class="visually-hidden" id="import-file" type="file" accept="application/json,.json">
+      </div>
+    </header>
+
+    <main>
+      <section class="overview" aria-label="有效期统计">
+        <button class="stat-card danger" id="stat-expired" type="button" aria-pressed="false">
+          <span class="stat-label">已过期</span>
+          <strong class="stat-number"><span id="expired-count">0</span><span class="stat-unit">件</span></strong>
+        </button>
+        <button class="stat-card warn" id="stat-soon" type="button" aria-pressed="false">
+          <span class="stat-label">临期</span>
+          <strong class="stat-number"><span id="soon-count">0</span><span class="stat-unit">件</span></strong>
+        </button>
+        <button class="stat-card" id="stat-total" type="button" aria-pressed="false">
+          <span class="stat-label">总计</span>
+          <strong class="stat-number"><span id="total-count">0</span><span class="stat-unit">件</span></strong>
+        </button>
+        <button class="stat-card money" id="stat-amount" type="button">
+          <span class="stat-label">总金额</span>
+          <strong class="stat-number"><span class="stat-currency">¥</span><span id="total-amount">0.00</span></strong>
+        </button>
+      </section>
+
+      <div class="search-wrap">
+        <span class="search-icon" aria-hidden="true">⌕</span>
+        <label class="visually-hidden" for="search-input">搜索物品</label>
+        <input class="search-input" id="search-input" type="search" placeholder="搜索名称、分类、位置或备注">
+      </div>
+
+      <section aria-label="物品列表">
+        <div class="date-filters" id="date-filter">
+          <div class="date-filter" data-part="year">
+            <input class="date-filter-input" type="text" inputmode="numeric" placeholder="年">
+            <button class="date-filter-toggle" type="button" aria-label="选择年份"></button>
+            <div class="date-filter-menu" hidden></div>
+          </div>
+          <div class="date-filter" data-part="month">
+            <input class="date-filter-input" type="text" inputmode="numeric" placeholder="月">
+            <button class="date-filter-toggle" type="button" aria-label="选择月份"></button>
+            <div class="date-filter-menu" hidden></div>
+          </div>
+          <div class="date-filter" data-part="day">
+            <input class="date-filter-input" type="text" inputmode="numeric" placeholder="日">
+            <button class="date-filter-toggle" type="button" aria-label="选择日期"></button>
+            <div class="date-filter-menu" hidden></div>
+          </div>
+        </div>
+        <nav class="category-row" id="category-filters" aria-label="按分类筛选"></nav>
+        <div class="item-list" id="item-list" aria-live="polite"></div>
+      </section>
+    </main>
+  </div>
+
+  <button class="add-button" id="add-button" type="button"><span aria-hidden="true">＋</span>添加物品</button>
+
+  <div class="modal-backdrop" id="item-modal" hidden>
+    <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="form-title">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="sheet-header">
+        <h2 id="form-title">添加物品</h2>
+        <button class="close-button" id="close-modal" type="button" aria-label="关闭">×</button>
+      </div>
+      <form id="item-form" novalidate>
+        <div class="form-grid">
+          <div class="field">
+            <label for="item-name">名称 <span aria-hidden="true">*</span></label>
+            <input id="item-name" name="name" type="text" maxlength="120" placeholder="例如：无线耳机" required>
+          </div>
+          <div class="field">
+            <label id="category-label">分类</label>
+            <div class="category-picker" id="item-category-options" role="group" aria-labelledby="category-label"></div>
+            <input class="category-input" id="item-category" name="category" type="text" maxlength="60" placeholder="输入分类名称" aria-label="自定义分类名称" hidden>
+          </div>
+          <div class="field">
+            <label for="item-quantity">数量</label>
+            <input id="item-quantity" name="qty" type="number" min="0" step="1" inputmode="numeric" value="1" required>
+          </div>
+          <div class="field">
+            <label for="item-amount">金额（选填）</label>
+            <input id="item-amount" name="amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="例如：29.90">
+          </div>
+          <div class="field">
+            <label id="produced-label">生产日期</label>
+            <div class="date-picker" id="produced-picker" aria-labelledby="produced-label">
+              <div class="date-picker-head">
+                <button class="date-value" type="button" data-role="value">未设置</button>
+                <button class="date-clear" type="button" data-role="clear" hidden>清除</button>
+              </div>
+              <div class="date-quick">
+                <button type="button" data-shift="0">今天</button>
+                <button type="button" data-shift="-7">7天前</button>
+                <button type="button" data-shift="-30">30天前</button>
+                <button type="button" data-shift="-365">1年前</button>
+              </div>
+              <div class="date-calendar" data-role="calendar" hidden></div>
+            </div>
+          </div>
+          <div class="field">
+            <label id="expiry-label">有效期</label>
+            <div class="date-picker" id="expiry-picker" aria-labelledby="expiry-label">
+              <div class="date-picker-head">
+                <button class="date-value" type="button" data-role="value">未设置</button>
+                <button class="date-clear" type="button" data-role="clear" hidden>清除</button>
+              </div>
+              <div class="date-quick">
+                <button type="button" data-shift="0">今天</button>
+                <button type="button" data-shift="7">7天后</button>
+                <button type="button" data-shift="30">30天后</button>
+                <button type="button" data-shift="365">1年后</button>
+              </div>
+              <div class="date-calendar" data-role="calendar" hidden></div>
+            </div>
+          </div>
+          <div class="field">
+            <label for="item-soon-days">临期天数</label>
+            <input class="short" id="item-soon-days" name="soonDays" type="number" min="1" max="365" step="1" inputmode="numeric" value="3">
+          </div>
+          <div class="field">
+            <label for="item-location">存放位置</label>
+            <input id="item-location" name="location" type="text" maxlength="120" placeholder="例如：书房抽屉">
+          </div>
+          <div class="field">
+            <label for="item-note">备注</label>
+            <textarea id="item-note" name="note" maxlength="1000" placeholder="补充说明（选填）"></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="delete-button" id="delete-button" type="button" hidden>删除</button>
+          <button class="save-button" type="submit">保存物品</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div class="dialog" id="app-dialog" hidden>
+    <div class="dialog-card" role="alertdialog" aria-modal="true" aria-labelledby="dialog-title" aria-describedby="dialog-text">
+      <h3 class="dialog-title" id="dialog-title"></h3>
+      <p class="dialog-text" id="dialog-text"></p>
+      <div class="dialog-actions">
+        <button class="dialog-button" id="dialog-cancel" type="button">取消</button>
+        <button class="dialog-button primary" id="dialog-confirm" type="button">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dialog" id="intro-dialog" hidden>
+    <div class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="intro-title">
+      <h3 class="dialog-title" id="intro-title">物品管家 · 使用细则</h3>
+      <ol class="intro-list">
+        <li>点右下角「＋ 添加物品」登记物品，名称必填，分类可以直接选预设，也可以自己输入。</li>
+        <li>填了有效期后，顶部「已过期 / 临期 / 总计」三张卡片会自动统计，点卡片只看对应的物品。</li>
+        <li>每件物品可以单独设置临期天数，默认是 3 天。</li>
+        <li>给物品填上金额，顶部「总金额」卡片会自动汇总；点它查看开销，并可用年 / 月 / 日筛选。</li>
+        <li>年 / 月 / 日三个筛选框既能下拉选择，也能直接键盘输入，清空即表示不限。</li>
+        <li>右上角「导出 / 导入」用来备份和恢复数据，换手机时先导出再导入即可。</li>
+      </ol>
+      <div class="intro-repo">
+        <span class="intro-repo-label">开源仓库</span>
+        <div class="intro-repo-row">
+          <code class="intro-repo-url">https://github.com/lanbaba521/iWannaDo.git</code>
+          <button class="intro-copy" id="intro-copy" type="button">复制</button>
+        </div>
+      </div>
+      <p class="intro-hint">选「关闭」则每次打开应用都会再弹出这份说明；选「不再提示」后不再自动弹出，想再看时点左上角的<strong>「物」字按钮</strong>即可重新打开。</p>
+      <div class="dialog-actions">
+        <button class="dialog-button primary" id="intro-close" type="button">关闭</button>
+        <button class="dialog-button" id="intro-never" type="button">不再提示</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
