@@ -25,3 +25,8 @@ node_modules/
 
 # 本地 SDK / JDK 配置
 local.properties
+
+# 签名密钥（仅本地保存，严禁入库）
+*.jks
+*.keystore
+keystore.properties
