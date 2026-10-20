@@ -12,7 +12,8 @@ import {
   localDateOf,
   isValidItem,
   validateItems,
-  matchesDateFilter
+  matchesDateFilter,
+  reminderPlan
 } from '../www/logic.js';
 
 test('dateString / todayString 返回 YYYY-MM-DD 且使用本地时区', () => {
@@ -130,4 +131,22 @@ test('matchesDateFilter 按年 / 月 / 日组合过滤', () => {
   assert.equal(matchesDateFilter(item, { year: '2026', month: '01', day: '02' }), false);
   // 全部为空，不过滤
   assert.equal(matchesDateFilter(item, {}), true);
+});
+
+test('reminderPlan 生成临期与过期提醒，跳过已过期日期', () => {
+  const items = [
+    { id: 'a', name: '牛奶', expiry: '2026-10-30', soonDays: 3 },
+    { id: 'b', name: '面包', expiry: '2026-10-10', soonDays: 3 },
+    { id: 'c', name: '无有效期', expiry: '', soonDays: 3 },
+    { id: 'd', name: '今天到期', expiry: '2026-10-20', soonDays: 3 }
+  ];
+  const plan = reminderPlan(items, '2026-10-20');
+  assert.deepEqual(
+    plan.map((entry) => `${entry.itemId}:${entry.kind}:${entry.date}`),
+    [
+      'a:soon:2026-10-27',
+      'a:expired:2026-10-30',
+      'd:expired:2026-10-20'
+    ]
+  );
 });

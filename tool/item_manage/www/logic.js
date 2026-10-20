@@ -42,6 +42,23 @@ export function expiryLabel(expiry, status, today) {
   return `有效期至 ${expiry}`;
 }
 
+// 计算需要安排的安卓本地提醒：临期提醒在进入临期窗口的第一天，过期提醒在到期当天。
+// 只返回日期，具体几点由调用方决定；已过期的日期不返回，避免补发旧通知。
+export function reminderPlan(items, today) {
+  const plan = [];
+  for (const item of items) {
+    if (!item?.expiry) continue;
+    const soonDate = shiftDays(item.expiry, -itemSoonDays(item));
+    if (soonDate >= today) {
+      plan.push({ itemId: item.id, kind: 'soon', date: soonDate, name: item.name, expiry: item.expiry });
+    }
+    if (item.expiry >= today) {
+      plan.push({ itemId: item.id, kind: 'expired', date: item.expiry, name: item.name, expiry: item.expiry });
+    }
+  }
+  return plan;
+}
+
 export function formatMoney(value) {
   return `¥${value.toFixed(2)}`;
 }

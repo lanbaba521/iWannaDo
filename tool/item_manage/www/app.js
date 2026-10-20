@@ -1,5 +1,5 @@
 import { Storage, Flags } from './storage.js';
-import { dateString, todayString, shiftDays, itemSoonDays, expiryStatus, expiryLabel, formatMoney, sumMoney, localDateOf, dayLabel, displayDate, validateItems, validateBackupItems, mergeItems, matchesDateFilter } from './logic.js';
+import { dateString, todayString, shiftDays, itemSoonDays, expiryStatus, expiryLabel, formatMoney, sumMoney, localDateOf, dayLabel, displayDate, reminderPlan, validateItems, validateBackupItems, mergeItems, matchesDateFilter } from './logic.js';
 
 const elements = {
   expiredCount: document.querySelector('#expired-count'),
@@ -521,11 +521,116 @@ function closeEditor() {
   editingId = null;
 }
 
+// 安卓本地提醒：临期、过期各一条，统一在当天 09:00 触发。
+// 每次数据变化都重排：先取消本应用已排期的通知，再按最新物品重新生成。
+const REMINDER_CHANNEL = 'item-reminders';
+const REMINDER_HOUR = 9;
+
+// 通知 ID：物品 ID 哈希 ×2 + 类型位（expired=1），同一物品的不同提醒互不冲突。
+function reminderId(itemId, kind) {
+  let hash = 0;
+  for (let index = 0; index < itemId.length; index += 1) {
+    hash = (hash * 31 + itemId.charCodeAt(index)) % 1000000000;
+  }
+  return hash * 2 + (kind === 'expired' ? 1 : 0);
+}
+
+async function syncReminders() {
+  const local = window.Capacitor?.Plugins?.LocalNotifications;
+  if (!local) return;
+
+  try {
+    const permission = await local.checkPermissions();
+    if (permission.display !== 'granted') return;
+
+    await local.createChannel({
+      id: REMINDER_CHANNEL,
+      name: '物品提醒',
+      description: '物品临期与过期提醒',
+      importance: 4
+    });
+
+    const pending = await local.getPending();
+    const scheduled = pending.notifications ?? [];
+    if (scheduled.length) {
+      await local.cancel({ notifications: scheduled.map(({ id }) => ({ id })) });
+    }
+
+    const now = Date.now();
+    const notifications = reminderPlan(activeItems(), todayString())
+      .map((entry) => {
+        const at = new Date(`${entry.date}T${String(REMINDER_HOUR).padStart(2, '0')}:00:00`);
+        if (Number.isNaN(at.getTime()) || at.getTime() <= now) return null;
+        return {
+          id: reminderId(entry.itemId, entry.kind),
+          title: entry.kind === 'expired' ? '物品已到期' : '物品临期提醒',
+          body: entry.kind === 'expired'
+            ? `「${entry.name}」已于 ${entry.expiry} 到期，请及时处理。`
+            : `「${entry.name}」将于 ${entry.expiry} 到期，请及时处理。`,
+          channelId: REMINDER_CHANNEL,
+          autoCancel: true,
+          // 不申请「闹钟与提醒」特殊权限，按非精确闹钟排期，避免弹出系统设置页。
+          isExactNotification: false,
+          schedule: { at, allowWhileIdle: true }
+        };
+      })
+      .filter(Boolean);
+
+    if (notifications.length) await local.schedule({ notifications });
+  } catch (error) {
+    console.error('同步物品提醒失败：', error);
+  }
+}
+
+// 启动时确认通知权限：未开启则先弹系统授权，仍被拒绝时提示用户提醒不会正常送达。
+// 用户选择「不再提示」后写入应用开关，之后不再弹这个说明。
+async function ensureReminderPermission() {
+  const local = window.Capacitor?.Plugins?.LocalNotifications;
+  if (!local) return;
+
+  try {
+    const current = await local.checkPermissions();
+    if (current.display === 'granted') {
+      await syncReminders();
+      return;
+    }
+
+    // 已选过「不再提示」时不再反复弹系统授权与应用内说明；仍可在系统设置里手动开启。
+    if (appFlags.reminderHintDismissed === true) return;
+
+    const asked = await local.requestPermissions();
+    if (asked.display === 'granted') {
+      await syncReminders();
+      return;
+    }
+
+    const choice = await confirmDialog({
+      title: '通知权限未开启',
+      message: '未开启通知权限，临期提醒和过期提醒将无法正常送达。本应用的通知仅用于临期与过期提醒，可前往系统设置开启。',
+      confirmText: '关闭',
+      cancelText: '不再提示',
+      cancelValue: 'never'
+    });
+    if (choice === 'never') {
+      appFlags.reminderHintDismissed = true;
+      try {
+        await Flags.push(appFlags);
+      } catch (error) {
+        console.error('保存通知提示状态失败：', error);
+      }
+    }
+  } catch (error) {
+    console.error('检查通知权限失败：', error);
+  }
+}
+
 async function saveItems(nextItems) {
   try {
     await Storage.push(nextItems);
     items = nextItems;
     render();
+    // 提醒重排放到后台执行，不阻塞保存与界面关闭。
+    syncReminders();
     return true;
   } catch (error) {
     console.error('保存物品失败：', error);
@@ -1008,4 +1113,5 @@ try {
   console.error('读取提示状态失败：', error);
 }
 render();
+if (storageReady) ensureReminderPermission();
 if (storageReady && !introDismissed) openIntro();
