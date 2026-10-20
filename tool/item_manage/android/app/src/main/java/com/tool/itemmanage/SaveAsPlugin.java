@@ -22,9 +22,9 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * 备份文件的系统级读写通道，基于 SAF（存储访问框架）：
- * - save：调起「另存为」界面，由用户选择目录与文件名；
+ * - save：调起「另存为」界面，由用户选择目录与文件名；支持传入目录级 URI 预置初始位置；
  * - overwrite：直接覆盖上次保存过的文件；
- * - pickBackup：调起「打开文件」界面，可定位到上次备份所在目录，并读出文件内容。
+ * - pickBackup：调起「打开文件」界面，并读出文件内容。
  */
 @CapacitorPlugin(name = "SaveAs")
 public class SaveAsPlugin extends Plugin {
@@ -177,6 +177,11 @@ public class SaveAsPlugin extends Plugin {
         call.resolve(canceled);
     }
 
+    /**
+     * 预置文件选择器的初始位置。只接受目录级 URI（如 ExternalStorageProvider 的
+     * content://.../document/primary:Download）：文件级 URI 会被部分厂商的选择器忽略，
+     * 反而造成困惑，因此导入不再传入初始位置，仅「另存为」用于定位上次保存目录。
+     */
     private void applyInitialUri(Intent intent, String initialUri) {
         if (initialUri == null || initialUri.isEmpty()) return;
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;

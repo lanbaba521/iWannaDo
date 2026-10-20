@@ -615,11 +615,29 @@ async function handleDelete() {
 
 // 安卓端 WebView 不响应 <a download>，因此提供两条导出通路：
 // 1. 保存到本机：调起系统「另存为」界面（SAF），用户可自选目录与文件名；
-//    若之前保存过，会先询问是否直接覆盖上次那个文件，换路径则新建。
+//    若之前保存过，会先询问是否直接覆盖上次那个文件，换路径则新建；
+//    另存为会尝试用目录级 URI 预置上次保存的位置（各厂商支持不一，不保证生效）。
 // 2. 分享：写入应用缓存目录后调起系统分享面板，可直接发给其他应用。
 // 浏览器端仍走普通下载。
 
-// 记录上次导出的备份位置（只存应用开关，不进备份文件），供下次覆盖和导入跳转使用。
+// 从记录的展示路径推导「目录」URI。各厂商文件选择器对 EXTRA_INITIAL_URI 支持不一，
+// DownloadsProvider 的文件 URI 常被忽略，改用 ExternalStorageProvider 的目录 URI 兼容性更好。
+function backupDirUri(path) {
+  if (typeof path !== 'string' || !path) return null;
+  const segments = path.split('/').filter(Boolean);
+  if (segments[0] === '内部存储') {
+    segments.shift();
+  } else if (segments[0] === 'storage' && segments[1] === 'emulated') {
+    // 兼容旧记录里的 /storage/emulated/0/... 原始路径。
+    segments.splice(0, 3);
+  }
+  if (segments.length < 2) return null;
+  const dir = segments.slice(0, -1).join('/').replace(/^下载(?=\/|$)/, 'Download');
+  if (!dir) return null;
+  return `content://com.android.externalstorage.documents/document/${encodeURIComponent(`primary:${dir}`)}`;
+}
+
+// 记录上次导出的备份位置（只存应用开关，不进备份文件），供下次覆盖与导入时提示。
 async function rememberBackupLocation(info) {
   if (!info?.uri) return;
   appFlags.lastBackup = {
@@ -646,9 +664,12 @@ async function exportBackup() {
   const plugins = window.Capacitor?.Plugins;
 
   if (plugins?.SaveAs || plugins?.Share) {
-    let initialUri = plugins?.SaveAs ? appFlags.lastBackup?.uri ?? null : null;
+    // 覆盖必须用文件级 URI；定位目录用兼容性更好的目录 URI，取不到再退回文件 URI。
+    const saved = plugins?.SaveAs ? appFlags.lastBackup : null;
+    let overwriteUri = saved?.uri ?? null;
+    let initialUri = plugins?.SaveAs ? backupDirUri(saved?.path) ?? overwriteUri : null;
 
-    if (initialUri) {
+    if (overwriteUri) {
       // 点「另存新文件」= 换位置；点遮罩或按返回键 = 放弃导出。
       const overwrite = await confirmDialog({
         title: '导出备份',
@@ -661,7 +682,7 @@ async function exportBackup() {
 
       if (overwrite === true) {
         try {
-          await plugins.SaveAs.overwrite({ uri: initialUri, data: json });
+          await plugins.SaveAs.overwrite({ uri: overwriteUri, data: json });
           await alertDialog({
             title: '导出成功',
             message: `已覆盖上次的备份：${appFlags.lastBackup.path || appFlags.lastBackup.name}`
@@ -670,6 +691,7 @@ async function exportBackup() {
         } catch (error) {
           console.error('覆盖备份失败：', error);
           // 文件被移动或权限失效时清掉记录，转而让用户重新选位置。
+          overwriteUri = null;
           initialUri = null;
           delete appFlags.lastBackup;
           try {
@@ -793,26 +815,19 @@ async function importBackupText(text) {
   }
 }
 
-// 安卓端用原生文件选择器导入：可定位到上次备份所在目录，并直接读出文件内容。
+// 安卓端用原生文件选择器导入：先提示上次导出路径，由用户自行前往选择。
 async function pickBackupToImport(saveAs) {
-  let initialUri = null;
   const last = appFlags.lastBackup;
 
-  if (last?.uri) {
-    // 点「重新选择」= 不预置位置；点遮罩或按返回键 = 放弃导入。
-    const jump = await confirmDialog({
+  if (last?.path || last?.name) {
+    await alertDialog({
       title: '导入备份',
-      message: `上次备份保存在：${last.path || last.name}。是否直接跳转到这个位置？`,
-      confirmText: '跳转过去',
-      cancelText: '重新选择',
-      cancelValue: 'browse'
+      message: `上次导出保存在：${last.path || last.name}。请在接下来的文件选择器中手动前往该位置选择备份文件。`
     });
-    if (jump === false) return;
-    if (jump === true) initialUri = last.uri;
   }
 
   try {
-    const result = await saveAs.pickBackup({ initialUri });
+    const result = await saveAs.pickBackup({});
     if (!result?.canceled && typeof result?.data === 'string') {
       await importBackupText(result.data);
     }
