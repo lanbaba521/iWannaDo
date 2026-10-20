@@ -1,19 +1,23 @@
 {
   "name": "item_manage",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "物品管家：手机端物品有效期 / 临期提醒与金额记账工具，纯前端 + Capacitor 打包为 Android APK。",
+  "private": true,
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test",
+    "sync:android": "cap sync android",
+    "build:apk": "powershell -ExecutionPolicy Bypass -File build-apk.ps1"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "license": "MIT",
   "dependencies": {
     "@capacitor/android": "^8.5.3",
     "@capacitor/cli": "^8.5.3",
     "@capacitor/core": "^8.5.3",
-    "@capacitor/preferences": "^8.0.1"
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/share": "^8.0.3"
   }
 }
