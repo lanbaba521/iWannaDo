@@ -7,7 +7,7 @@
   <title>物品管家</title>
   <style>
     :root {
-      color-scheme: light;
+      color-scheme: light dark;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
       font-synthesis: none;
       text-rendering: optimizeLegibility;
@@ -578,6 +578,180 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; }
     }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --ink: #e6e8ef;
+        --muted: #9aa1b3;
+        --line: #2c3142;
+        --page: #14161d;
+      }
+      .icon-button {
+        background: #1c1f2a;
+        color: #aeb4c2;
+      }
+      .stat-card {
+        border-color: #2c3142;
+        background: #1c1f2a;
+        box-shadow: 0 5px 18px #0000004d;
+      }
+      .stat-card.active {
+        border-color: #3d4a7a;
+        box-shadow: 0 0 0 2px #4f7cff33, 0 5px 18px #00000059;
+      }
+      .stat-card.danger .stat-number { color: #ff8a80; }
+      .stat-card.warn .stat-number { color: #f0b95c; }
+      .stat-card.money .stat-number { color: #5fd3b0; }
+      .date-picker {
+        border-color: #2c3142;
+        background: #222634;
+      }
+      .date-value {
+        border-color: #2c3142;
+        background: #1c1f2a;
+        color: #8b91a1;
+      }
+      .date-value.filled {
+        border-color: #4a5a99;
+        background: #232a4d;
+        color: #9db4ff;
+      }
+      .date-clear {
+        border-color: #2c3142;
+        background: #1c1f2a;
+        color: #9aa1b3;
+      }
+      .date-quick button {
+        border-color: #2c3142;
+        background: #1c1f2a;
+        color: #a6acba;
+      }
+      .date-quick button:active {
+        border-color: #4a5a99;
+        background: #232a4d;
+        color: #9db4ff;
+      }
+      .date-calendar {
+        border-color: #2c3142;
+        background: #1c1f2a;
+      }
+      .cal-nav {
+        background: #2a2f3d;
+        color: #aab0bd;
+      }
+      .cal-week span { color: #8b91a1; }
+      .cal-day.today {
+        background: #232a4d;
+        color: #9db4ff;
+      }
+      .search-icon { color: #8b91a1; }
+      .search-input {
+        background: #1c1f2a;
+        box-shadow: 0 4px 14px #0000004d;
+      }
+      .search-input:focus { border-color: #4a5a99; }
+      .search-input::placeholder { color: #767d8d; }
+      .date-filter {
+        border-color: #2c3142;
+        background: #1c1f2a;
+      }
+      .date-filter:focus-within { border-color: #4a5a99; }
+      .date-filter-input::placeholder { color: #767d8d; }
+      .date-filter-toggle {
+        background: #2a2f3d;
+        color: #a6acba;
+      }
+      .date-filter.open .date-filter-toggle {
+        background: #232a4d;
+        color: #9db4ff;
+      }
+      .date-filter-menu {
+        border-color: #2c3142;
+        background: #1c1f2a;
+        box-shadow: 0 10px 30px #00000073;
+      }
+      .date-filter-option { color: #cdd2dd; }
+      .date-filter-option.active {
+        background: #232a4d;
+        color: #9db4ff;
+      }
+      .category-chip {
+        border-color: #2c3142;
+        background: #1c1f2a;
+        color: #a6acba;
+      }
+      .day-group {
+        border-color: #2c3142;
+        background: #1c1f2a;
+        box-shadow: 0 4px 15px #00000040;
+      }
+      .day-group[open] { border-color: #36406b; }
+      .day-date { color: #cdd2dd; }
+      .day-chevron { color: #7a8090; }
+      .day-body { border-top-color: #262b39; }
+      .day-body .item-card + .item-card { border-top-color: #2a2f3d; }
+      .item-card {
+        border-color: #2c3142;
+        background: #1c1f2a;
+        box-shadow: 0 4px 15px #00000040;
+      }
+      .tag {
+        background: #253053;
+        color: #9db0e8;
+      }
+      .tag.location { background: #2a2f3d; color: #a3a9b6; }
+      .tag.expiry.expired { background: #3a2022; color: #ff8f86; }
+      .tag.expiry.soon { background: #3a2e18; color: #f0b95c; }
+      .tag.expiry.normal { background: #2a2f3d; color: #a3a9b6; }
+      .tag.produced { background: #2a2f3d; color: #a3a9b6; }
+      .tag.amount { background: #17332b; color: #5fd3b0; }
+      .item-note { color: #9aa1b3; }
+      .empty-state { border-color: #3a4155; }
+      .modal-backdrop { background: #000000a8; }
+      .sheet { background: #1c1f2a; }
+      .sheet-handle { background: #363c4d; }
+      .close-button {
+        background: #2a2f3d;
+        color: #aab0bd;
+      }
+      .dialog { background: #000000a8; }
+      .dialog-card {
+        background: #1c1f2a;
+        box-shadow: 0 22px 52px #00000080;
+      }
+      .dialog-text { color: #a5abb9; }
+      .dialog-button {
+        border-color: #2c3142;
+        background: #1c1f2a;
+        color: #c8cdd9;
+      }
+      .dialog-button:active { background: #2a2f3d; }
+      .intro-list { color: #a5abb9; }
+      .intro-repo {
+        border-color: #2c3142;
+        background: #222634;
+      }
+      .intro-repo-url { color: #aab6d6; }
+      .intro-copy {
+        border-color: #2c3142;
+        background: #1c1f2a;
+        color: #c8cdd9;
+      }
+      .intro-hint { color: #a5abb9; }
+      .field label { color: #b6bcc9; }
+      .field input, .field textarea {
+        border-color: #2c3142;
+        background: #222634;
+      }
+      .field input:focus, .field textarea:focus {
+        border-color: #4a5a99;
+        background: #262b39;
+      }
+      .field input::placeholder, .field textarea::placeholder { color: #767d8d; }
+      .delete-button {
+        background: #3a2026;
+        color: #ff8f8f;
+      }
+    }
   </style>
 </head>
 <body>
@@ -593,7 +767,7 @@
       <div class="toolbar" aria-label="数据管理">
         <button class="icon-button" id="export-button" type="button">导出</button>
         <button class="icon-button" id="import-button" type="button">导入</button>
-        <input class="visually-hidden" id="import-file" type="file" accept="application/json,.json">
+        <input class="visually-hidden" id="import-file" type="file" accept="*/*">
       </div>
     </header>
 
@@ -748,7 +922,8 @@
         <li>每件物品可以单独设置临期天数，默认是 3 天。</li>
         <li>给物品填上金额，顶部「总金额」卡片会自动汇总；点它查看开销，并可用年 / 月 / 日筛选。</li>
         <li>年 / 月 / 日三个筛选框既能下拉选择，也能直接键盘输入，清空即表示不限。</li>
-        <li>右上角「导出 / 导入」用来备份和恢复数据，换手机时先导出再导入即可。</li>
+        <li>右上角「导出 / 导入」用来备份和恢复数据，换手机时先导出再导入即可。导出会记住上次保存的位置，下次可直接「覆盖上次」，也可以「另存新文件」或「分享」；导入时会提示上次备份位置，可一键跳转过去，导入方式可选「覆盖导入」或「合并导入」。导出内容与界面上看到的物品完全一致。</li>
+        <li>删除物品后无法恢复，重要数据请先导出备份。</li>
       </ol>
       <div class="intro-repo">
         <span class="intro-repo-label">开源仓库</span>

@@ -1,4 +1,5 @@
 import { Storage, Flags } from './storage.js';
+import { dateString, todayString, shiftDays, itemSoonDays, expiryStatus, expiryLabel, formatMoney, sumMoney, localDateOf, dayLabel, displayDate, validateItems, validateBackupItems, mergeItems, matchesDateFilter } from './logic.js';
 
 const elements = {
   expiredCount: document.querySelector('#expired-count'),
@@ -54,73 +55,12 @@ let ledgerYear = '';
 let ledgerMonth = '';
 let ledgerDay = '';
 let introDismissed = false;
+// 应用开关缓存：读取一次后整体写回，避免新增字段时把旧字段覆盖掉。
+let appFlags = {};
 
 const INTRO_URL = 'https://github.com/lanbaba521/iWannaDo.git';
 
-const DEFAULT_SOON_DAYS = 3;
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
-
-function dateString(date) {
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
-}
-
-function todayString() {
-  return dateString(new Date());
-}
-
-function shiftDays(value, days) {
-  const base = value ? new Date(`${value}T00:00:00`) : new Date();
-  return dateString(new Date(base.getFullYear(), base.getMonth(), base.getDate() + days));
-}
-
-function daysBetween(from, to) {
-  return Math.round((new Date(`${to}T00:00:00`) - new Date(`${from}T00:00:00`)) / 86400000);
-}
-
-function itemSoonDays(item) {
-  const value = Number(item?.soonDays);
-  return Number.isInteger(value) && value >= 1 ? value : DEFAULT_SOON_DAYS;
-}
-
-function expiryStatus(item, today) {
-  if (!item.expiry) return 'none';
-  if (item.expiry < today) return 'expired';
-  return item.expiry <= shiftDays(today, itemSoonDays(item)) ? 'soon' : 'normal';
-}
-
-function expiryLabel(expiry, status, today) {
-  if (status === 'expired') return `已过期 ${daysBetween(expiry, today)} 天`;
-  if (status === 'soon') {
-    const left = daysBetween(today, expiry);
-    return left === 0 ? '今天过期' : `${left} 天后过期`;
-  }
-  return `有效期至 ${expiry}`;
-}
-
-function formatMoney(value) {
-  return `¥${value.toFixed(2)}`;
-}
-
-function sumMoney(values) {
-  return Math.round(values.reduce((total, value) => total + value, 0) * 100) / 100;
-}
-
-function localDateOf(value) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? todayString() : dateString(date);
-}
-
-function dayLabel(value) {
-  const [, month, day] = value.split('-');
-  return `${Number(month)}月${Number(day)}日`;
-}
-
-function displayDate(value) {
-  const [year, month, day] = value.split('-');
-  return `${year}年${Number(month)}月${Number(day)}日`;
-}
 
 function pickerValue(picker) {
   return picker.dataset.value || '';
@@ -241,14 +181,17 @@ function setupDatePicker(picker) {
 }
 
 let dialogResolve = null;
+// 「取消」按钮的返回值，默认 false；个别场景（如导出选择）需要区分「取消」与「关闭弹窗」。
+let dialogCancelValue = false;
 
-function openDialog({ title, message, confirmText = '确定', cancelText = '取消', danger = false, cancellable = true }) {
+function openDialog({ title, message, confirmText = '确定', cancelText = '取消', danger = false, cancellable = true, cancelValue = false }) {
   elements.dialogTitle.textContent = title;
   elements.dialogText.textContent = message;
   elements.dialogConfirm.textContent = confirmText;
   elements.dialogConfirm.classList.toggle('danger', danger);
   elements.dialogCancel.textContent = cancelText;
   elements.dialogCancel.hidden = !cancellable;
+  dialogCancelValue = cancelValue;
   elements.dialog.hidden = false;
   return new Promise((resolve) => {
     dialogResolve = resolve;
@@ -279,8 +222,9 @@ async function closeIntro(never) {
   elements.intro.hidden = true;
   if (!never) return;
   introDismissed = true;
+  appFlags.introDismissed = true;
   try {
-    await Flags.push({ introDismissed: true });
+    await Flags.push(appFlags);
   } catch (error) {
     console.error('保存提示状态失败：', error);
   }
@@ -308,39 +252,6 @@ function renderCategoryOptions() {
     makeCategoryChip('其他', categoryCustomOpen, 'custom')
   );
   elements.category.hidden = !categoryCustomOpen;
-}
-
-function isValidItem(item) {
-  return item !== null
-    && typeof item === 'object'
-    && typeof item.id === 'string'
-    && typeof item.name === 'string'
-    && item.name.trim() !== ''
-    && typeof item.category === 'string'
-    && Number.isInteger(item.qty)
-    && item.qty >= 0
-    && typeof item.location === 'string'
-    && typeof item.note === 'string'
-    && (item.amount === undefined || (typeof item.amount === 'number' && Number.isFinite(item.amount) && item.amount >= 0))
-    && (item.produced === undefined || typeof item.produced === 'string')
-    && (item.expiry === undefined || typeof item.expiry === 'string')
-    && (item.soonDays === undefined || Number.isInteger(item.soonDays))
-    && typeof item.createdAt === 'string'
-    && typeof item.updatedAt === 'string'
-    && typeof item.deleted === 'boolean';
-}
-
-function validateItems(data) {
-  if (!Array.isArray(data) || !data.every(isValidItem)) {
-    throw new Error('数据格式错误：物品必须包含有效的 id、name、category、qty、amount、produced、expiry、soonDays、location、note、createdAt、updatedAt 和 deleted 字段。');
-  }
-  return data.map((item) => ({
-    ...item,
-    amount: Number.isFinite(item.amount) && item.amount >= 0 ? item.amount : 0,
-    produced: item.produced ?? '',
-    expiry: item.expiry ?? '',
-    soonDays: itemSoonDays(item)
-  }));
 }
 
 function makeId() {
@@ -473,14 +384,6 @@ function datePartText(key, value) {
   return `${Number(value)}${key === 'month' ? '月' : '日'}`;
 }
 
-function matchesDateFilter(item) {
-  const day = localDateOf(item.createdAt);
-  if (ledgerYear && day.slice(0, 4) !== ledgerYear) return false;
-  if (ledgerMonth && day.slice(5, 7) !== ledgerMonth) return false;
-  if (ledgerDay && day.slice(8, 10) !== ledgerDay) return false;
-  return true;
-}
-
 function syncDatePart(key, raw) {
   const text = raw.replace(/\D/g, '');
   if (key === 'year') {
@@ -557,7 +460,7 @@ function renderList() {
     const searchableText = [item.name, item.category, item.location, item.note]
       .join(' ')
       .toLocaleLowerCase('zh-CN');
-    return matchesCategory && matchesStatus && matchesDateFilter(item) && searchableText.includes(query);
+    return matchesCategory && matchesStatus && matchesDateFilter(item, { year: ledgerYear, month: ledgerMonth, day: ledgerDay }) && searchableText.includes(query);
   });
 
   if (visible.length === 0) {
@@ -700,53 +603,222 @@ async function handleDelete() {
   if (!item) return;
   const confirmed = await confirmDialog({
     title: '删除物品',
-    message: `确定删除“${item.name}”吗？删除后可通过导入备份恢复。`,
+    message: `确定删除“${item.name}”吗？删除后无法恢复，如需保留请先导出备份。`,
     confirmText: '删除',
     danger: true
   });
   if (!confirmed) return;
-  const deletedItem = { ...item, deleted: true, updatedAt: new Date().toISOString() };
-  const nextItems = items.map((entry) => entry.id === item.id ? deletedItem : entry);
+  // 直接移除记录，不做软删除：本地不留任何界面上看不到的数据。
+  const nextItems = items.filter((entry) => entry.id !== item.id);
   if (await saveItems(nextItems)) closeEditor();
 }
 
-function exportBackup() {
+// 安卓端 WebView 不响应 <a download>，因此提供两条导出通路：
+// 1. 保存到本机：调起系统「另存为」界面（SAF），用户可自选目录与文件名；
+//    若之前保存过，会先询问是否直接覆盖上次那个文件，换路径则新建。
+// 2. 分享：写入应用缓存目录后调起系统分享面板，可直接发给其他应用。
+// 浏览器端仍走普通下载。
+
+// 记录上次导出的备份位置（只存应用开关，不进备份文件），供下次覆盖和导入跳转使用。
+async function rememberBackupLocation(info) {
+  if (!info?.uri) return;
+  appFlags.lastBackup = {
+    uri: info.uri,
+    name: info.name || '',
+    path: info.path || info.name || ''
+  };
+  try {
+    await Flags.push(appFlags);
+  } catch (error) {
+    console.error('记录备份位置失败：', error);
+  }
+}
+
+async function exportBackup() {
   const backup = {
     version: 1,
     exportedAt: new Date().toISOString(),
-    items
+    // 只导出界面上可见的物品，备份内容与所见一致。
+    items: activeItems()
   };
-  const file = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
+  const json = JSON.stringify(backup, null, 2);
+  const filename = `物品管家备份-${todayString()}.json`;
+  const plugins = window.Capacitor?.Plugins;
+
+  if (plugins?.SaveAs || plugins?.Share) {
+    let initialUri = plugins?.SaveAs ? appFlags.lastBackup?.uri ?? null : null;
+
+    if (initialUri) {
+      // 点「另存新文件」= 换位置；点遮罩或按返回键 = 放弃导出。
+      const overwrite = await confirmDialog({
+        title: '导出备份',
+        message: `上次备份保存在：${appFlags.lastBackup.path || appFlags.lastBackup.name}。「覆盖上次」会直接更新这个文件；「另存新文件」可以换目录或换文件名。`,
+        confirmText: '覆盖上次',
+        cancelText: '另存新文件',
+        cancelValue: 'new'
+      });
+      if (overwrite === false) return;
+
+      if (overwrite === true) {
+        try {
+          await plugins.SaveAs.overwrite({ uri: initialUri, data: json });
+          await alertDialog({
+            title: '导出成功',
+            message: `已覆盖上次的备份：${appFlags.lastBackup.path || appFlags.lastBackup.name}`
+          });
+          return;
+        } catch (error) {
+          console.error('覆盖备份失败：', error);
+          // 文件被移动或权限失效时清掉记录，转而让用户重新选位置。
+          initialUri = null;
+          delete appFlags.lastBackup;
+          try {
+            await Flags.push(appFlags);
+          } catch (ignored) {
+            // 忽略：记录清理失败不影响本次导出。
+          }
+          await alertDialog({
+            title: '无法覆盖',
+            message: '上次的备份位置已无法访问（文件可能被移动或删除），请重新选择保存位置。'
+          });
+        }
+      }
+    }
+
+    // 点「取消」按钮 = 分享；点遮罩或按返回键 = 放弃导出。
+    const choice = await confirmDialog({
+      title: '导出备份',
+      message: '「保存到本机」可以选择保存目录和文件名；「分享」会调起系统分享面板，可发送到邮件、云盘、文件管理器等支持 JSON 文件的应用。',
+      confirmText: '保存到本机',
+      cancelText: '分享',
+      cancelValue: 'share'
+    });
+
+    if (choice === false) return;
+
+    if (choice === true) {
+      if (!plugins?.SaveAs) throw new Error('当前版本不支持选择保存位置，请安装最新版本后再试。');
+      const result = await plugins.SaveAs.save({
+        filename,
+        data: json,
+        mimeType: 'application/json',
+        initialUri
+      });
+      if (!result?.canceled) {
+        await rememberBackupLocation(result);
+        await alertDialog({
+          title: '导出成功',
+          message: `备份已保存到：${result.path || result.name}`
+        });
+      }
+      return;
+    }
+
+    if (plugins?.Filesystem && plugins?.Share) {
+      const { uri } = await plugins.Filesystem.writeFile({
+        path: filename,
+        data: json,
+        directory: 'CACHE',
+        encoding: 'utf8'
+      });
+      await plugins.Share.share({
+        title: '物品管家备份',
+        dialogTitle: '分享备份文件',
+        files: [uri]
+      });
+      return;
+    }
+  }
+
+  const file = new Blob([json], { type: 'application/json;charset=utf-8' });
   const url = URL.createObjectURL(file);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `物品管家备份-${new Date().toISOString().slice(0, 10)}.json`;
+  link.download = filename;
   document.body.append(link);
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-async function importBackup(file) {
+async function importBackupText(text) {
   try {
-    const backup = JSON.parse(await file.text());
+    const backup = JSON.parse(text);
     if (!backup || typeof backup !== 'object' || backup.version !== 1 || !Array.isArray(backup.items)) {
       throw new Error('备份文件结构不正确：需要包含 version: 1 和 items 数组。');
     }
-    const importedItems = validateItems(backup.items);
-    const confirmed = await confirmDialog({
+    // 历史备份里可能带 deleted: true 的墓碑，直接忽略，保证导入后本地没有隐藏数据。
+    const importedItems = validateBackupItems(backup.items).filter((item) => !item.deleted);
+    if (importedItems.length === 0) {
+      throw new Error('这个备份里没有可导入的物品。');
+    }
+    // 点「取消」按钮 = 合并导入；点遮罩或按返回键 = 放弃导入。
+    const choice = await confirmDialog({
       title: '导入备份',
-      message: `将导入 ${importedItems.length} 条物品数据并覆盖当前数据，确定继续吗？`,
+      message: `备份 ${importedItems.length} 条、本地 ${activeItems().length} 条。「覆盖导入」会清空本地并按备份重建；「合并导入」保留本地数据，只补充本地没有的物品。`,
       confirmText: '覆盖导入',
+      cancelText: '合并导入',
+      cancelValue: 'merge',
       danger: true
     });
-    if (!confirmed) return;
-    await saveItems(importedItems);
+    if (choice === false) return;
+
+    if (choice === 'merge') {
+      const merged = mergeItems(items, importedItems);
+      if (merged.addedCount === 0) {
+        await alertDialog({
+          title: '无需合并',
+          message: `备份中的 ${importedItems.length} 条物品本地都已存在，没有新增内容。`
+        });
+        return;
+      }
+      if (await saveItems(merged.items)) {
+        await alertDialog({
+          title: '合并完成',
+          message: `新增 ${merged.addedCount} 条，跳过本地已有的 ${merged.skippedCount} 条，现在共 ${merged.items.length} 条。`
+        });
+      }
+      return;
+    }
+
+    if (await saveItems(importedItems)) {
+      await alertDialog({
+        title: '覆盖完成',
+        message: `已用备份中的 ${importedItems.length} 条物品替换本地数据。`
+      });
+    }
   } catch (error) {
     console.error('导入备份失败：', error);
     await alertDialog({ title: '导入失败', message: error.message || '文件无法读取，请选择有效的 JSON 备份。' });
-  } finally {
-    elements.importFile.value = '';
+  }
+}
+
+// 安卓端用原生文件选择器导入：可定位到上次备份所在目录，并直接读出文件内容。
+async function pickBackupToImport(saveAs) {
+  let initialUri = null;
+  const last = appFlags.lastBackup;
+
+  if (last?.uri) {
+    // 点「重新选择」= 不预置位置；点遮罩或按返回键 = 放弃导入。
+    const jump = await confirmDialog({
+      title: '导入备份',
+      message: `上次备份保存在：${last.path || last.name}。是否直接跳转到这个位置？`,
+      confirmText: '跳转过去',
+      cancelText: '重新选择',
+      cancelValue: 'browse'
+    });
+    if (jump === false) return;
+    if (jump === true) initialUri = last.uri;
+  }
+
+  try {
+    const result = await saveAs.pickBackup({ initialUri });
+    if (!result?.canceled && typeof result?.data === 'string') {
+      await importBackupText(result.data);
+    }
+  } catch (error) {
+    console.error('选择备份文件失败：', error);
+    await alertDialog({ title: '导入失败', message: error.message || '无法读取所选文件。' });
   }
 }
 
@@ -768,7 +840,7 @@ document.addEventListener('keydown', (event) => {
   if (!elements.modal.hidden) closeEditor();
 });
 elements.dialogConfirm.addEventListener('click', () => closeDialog(true));
-elements.dialogCancel.addEventListener('click', () => closeDialog(false));
+elements.dialogCancel.addEventListener('click', () => closeDialog(dialogCancelValue));
 elements.dialog.addEventListener('click', (event) => {
   if (event.target === elements.dialog) closeDialog(false);
 });
@@ -862,18 +934,32 @@ document.addEventListener('click', (event) => {
 });
 document.querySelector('#export-button').addEventListener('click', async () => {
   try {
-    exportBackup();
+    await exportBackup();
   } catch (error) {
     console.error('导出备份失败：', error);
     await alertDialog({ title: '导出失败', message: error.message || '请重试。' });
   }
 });
 document.querySelector('#import-button').addEventListener('click', () => {
-  if (storageReady) elements.importFile.click();
+  if (!storageReady) return;
+  const saveAs = window.Capacitor?.Plugins?.SaveAs;
+  if (saveAs) {
+    pickBackupToImport(saveAs);
+    return;
+  }
+  elements.importFile.click();
 });
-elements.importFile.addEventListener('change', (event) => {
+elements.importFile.addEventListener('change', async (event) => {
   const [file] = event.target.files;
-  if (file) importBackup(file);
+  if (!file) return;
+  try {
+    await importBackupText(await file.text());
+  } catch (error) {
+    console.error('读取备份文件失败：', error);
+    await alertDialog({ title: '导入失败', message: '文件无法读取，请选择有效的 JSON 备份。' });
+  } finally {
+    elements.importFile.value = '';
+  }
 });
 elements.quantity.addEventListener('input', () => elements.quantity.setCustomValidity(''));
 elements.amount.addEventListener('input', () => elements.amount.setCustomValidity(''));
@@ -882,8 +968,17 @@ elements.name.addEventListener('input', () => elements.name.setCustomValidity(''
 
 try {
   const storedItems = await Storage.pull();
-  items = validateItems(storedItems);
+  const allItems = validateItems(storedItems);
+  // 旧版本用软删除存过墓碑，启动时清掉并写回，保证本地不存在界面上看不到的数据。
+  items = allItems.filter((item) => !item.deleted);
   storageReady = true;
+  if (items.length !== allItems.length) {
+    try {
+      await Storage.push(items);
+    } catch (error) {
+      console.error('清理已删除物品失败：', error);
+    }
+  }
 } catch (error) {
   console.error('读取物品失败：', error);
   await alertDialog({ title: '读取数据失败', message: error.message || '请检查存储配置后重新打开应用。' });
@@ -892,8 +987,8 @@ try {
   document.querySelector('#export-button').disabled = true;
 }
 try {
-  const flags = await Flags.pull();
-  introDismissed = flags?.introDismissed === true;
+  appFlags = (await Flags.pull()) ?? {};
+  introDismissed = appFlags.introDismissed === true;
 } catch (error) {
   console.error('读取提示状态失败：', error);
 }
